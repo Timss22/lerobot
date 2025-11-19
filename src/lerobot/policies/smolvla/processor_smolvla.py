@@ -32,6 +32,7 @@ from lerobot.processor import (
     TokenizerProcessorStep,
     UnnormalizerProcessorStep,
 )
+from lerobot.processor.yolo_processor import YOLOBoundingBoxProcessorStep #new update
 from lerobot.processor.converters import policy_action_to_transition, transition_to_policy_action
 from lerobot.utils.constants import POLICY_POSTPROCESSOR_DEFAULT_NAME, POLICY_PREPROCESSOR_DEFAULT_NAME
 
@@ -48,11 +49,20 @@ def make_smolvla_pre_post_processors(
 
     The pre-processing pipeline prepares input data for the model by:
     1.  Renaming features to match pretrained configurations.
-    2.  Normalizing input and output features based on dataset statistics.
-    3.  Adding a batch dimension.
-    4.  Ensuring the language task description ends with a newline character.
-    5.  Tokenizing the language task description.
-    6.  Moving all data to the specified device.
+    # new update
+    2.  Running YOLO on images to extract bounding boxes (if enabled).
+    3.  Concatenating bounding boxes to state.
+    4.  Normalizing input and output features based on dataset statistics.
+    5.  Adding a batch dimension.
+    6.  Ensuring the language task description ends with a newline character.
+    7.  Tokenizing the language task description.
+    8.  Moving all data to the specified device.
+    # end new update
+    # 2.  Normalizing input and output features based on dataset statistics.
+    # 3.  Adding a batch dimension.
+    # 4.  Ensuring the language task description ends with a newline character.
+    # 5.  Tokenizing the language task description.
+    # 6.  Moving all data to the specified device.
 
     The post-processing pipeline handles the model's output by:
     1.  Moving data to the CPU.
@@ -68,6 +78,23 @@ def make_smolvla_pre_post_processors(
 
     input_steps = [
         RenameObservationsProcessorStep(rename_map={}),  # To mimic the same processor as pretrained one
+    ]
+    # new update
+    # Add YOLO processor if enabled
+    if config.use_yolo_bboxes and config.yolo_model_path:
+        input_steps.append(
+            YOLOBoundingBoxProcessorStep(
+                yolo_model_path=config.yolo_model_path,
+                confidence_threshold=config.yolo_confidence_threshold,
+                max_detections_per_camera=config.yolo_max_detections_per_camera,
+                camera_names=config.yolo_camera_names,
+                camera_weights=config.yolo_camera_weights,
+                device=config.device,
+            )
+        )
+    #end new update
+    input_steps.extend([
+    # new update
         AddBatchDimensionProcessorStep(),
         SmolVLANewLineProcessor(),
         TokenizerProcessorStep(
@@ -82,7 +109,7 @@ def make_smolvla_pre_post_processors(
             norm_map=config.normalization_mapping,
             stats=dataset_stats,
         ),
-    ]
+    ])
     output_steps = [
         UnnormalizerProcessorStep(
             features=config.output_features, norm_map=config.normalization_mapping, stats=dataset_stats

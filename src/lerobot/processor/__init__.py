@@ -76,6 +76,7 @@ from .policy_robot_bridge import (
 )
 from .rename_processor import RenameObservationsProcessorStep
 from .tokenizer_processor import TokenizerProcessorStep
+from .yolo_processor import YOLOBoundingBoxProcessorStep #new update
 
 __all__ = [
     "ActionProcessorStep",
@@ -117,6 +118,7 @@ __all__ = [
     "RenameObservationsProcessorStep",
     "RewardClassifierProcessorStep",
     "RewardProcessorStep",
+    "YOLOBoundingBoxProcessorStep", #new update
     "DataProcessorPipeline",
     "TimeLimitProcessorStep",
     "AddBatchDimensionProcessorStep",

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from dataclasses import dataclass, field
+from pathlib import Path #new update
 
 from lerobot.configs.policies import PreTrainedConfig
 from lerobot.configs.types import FeatureType, NormalizationMode, PolicyFeature
@@ -40,9 +41,22 @@ class SmolVLAConfig(PreTrainedConfig):
     )
 
     # Shorter state and action vectors will be padded
+    # new update
+    # If auto_detect_state_dim is True, max_state_dim will be computed from dataset
+    # Otherwise, use the specified value
+    auto_detect_state_dim: bool = True
+    # end new update
     max_state_dim: int = 32
     max_action_dim: int = 32
-
+    
+    # YOLO bounding box integration
+    use_yolo_bboxes: bool = False
+    yolo_model_path: str | None = None
+    yolo_confidence_threshold: float = 0.75
+    yolo_max_detections_per_camera: int = 1
+    yolo_camera_names: list[str] | None = None  # If None, processes all cameras
+    yolo_camera_weights: dict[str, float] | None = None  # Optional weights per camera
+    # end new update
     # Image preprocessing
     resize_imgs_with_padding: tuple[int, int] = (512, 512)
 
@@ -115,6 +129,32 @@ class SmolVLAConfig(PreTrainedConfig):
             raise NotImplementedError(
                 "`use_delta_joint_actions_aloha` is used by smolvla for aloha real models. It is not ported yet in LeRobot."
             )
+        # new update
+        # Validate YOLO configuration
+        if self.use_yolo_bboxes:
+            if self.yolo_model_path is None:
+                raise ValueError(
+                    "`yolo_model_path` must be specified when `use_yolo_bboxes=True`. "
+                    "Please provide the path to your YOLO model file (.pt)."
+                )
+            if not Path(self.yolo_model_path).exists():
+                raise FileNotFoundError(
+                    f"YOLO model file not found: {self.yolo_model_path}. "
+                    "Please provide a valid path to your YOLO model."
+                )
+            
+            # Calculate bounding box dimension contribution
+            # Each detection: [x1, y1, x2, y2, confidence] = 5 values
+            bbox_dim_per_detection = 5
+            num_cameras = len(self.yolo_camera_names) if self.yolo_camera_names else 3  # Default to 3 cameras
+            bbox_dim = num_cameras * self.yolo_max_detections_per_camera * bbox_dim_per_detection
+            
+            # If auto_detect_state_dim is False, we need to ensure max_state_dim accounts for bboxes
+            if not self.auto_detect_state_dim:
+                # Note: This is a warning, not an error, as the user might want to set it manually
+                # The actual state dimension will be: original_state_dim + bbox_dim
+                pass
+        # end new update
 
     def validate_features(self) -> None:
         for i in range(self.empty_cameras):
@@ -124,7 +164,55 @@ class SmolVLAConfig(PreTrainedConfig):
                 shape=(3, 480, 640),
             )
             self.input_features[key] = empty_camera
-
+        # new update
+        # Auto-detect state dimension if enabled
+        if self.auto_detect_state_dim:
+            from lerobot.utils.constants import OBS_STATE
+            
+            # Get original state dimension from input features
+            original_state_dim = 0
+            if OBS_STATE in self.input_features:
+                state_shape = self.input_features[OBS_STATE].shape
+                if state_shape:
+                    original_state_dim = state_shape[0] if isinstance(state_shape[0], int) else 0
+            
+            # Calculate bounding box dimension if YOLO is enabled
+            bbox_dim = 0
+            if self.use_yolo_bboxes:
+                # Each detection: [x1, y1, x2, y2, confidence] = 5 values
+                bbox_dim_per_detection = 5
+                num_cameras = len(self.yolo_camera_names) if self.yolo_camera_names else 3  # Default to 3
+                bbox_dim = num_cameras * self.yolo_max_detections_per_camera * bbox_dim_per_detection
+            
+            # Update max_state_dim to accommodate original state + bounding boxes
+            total_state_dim = original_state_dim + bbox_dim
+            if total_state_dim > 0:
+                self.max_state_dim = total_state_dim
+                # Also update the state feature shape if it exists
+                if OBS_STATE in self.input_features:
+                    self.input_features[OBS_STATE] = PolicyFeature(
+                        type=FeatureType.STATE,
+                        shape=(self.max_state_dim,),
+                    )
+        else:
+            # Manual mode: validate that max_state_dim is sufficient
+            from lerobot.utils.constants import OBS_STATE
+            if OBS_STATE in self.input_features:
+                state_shape = self.input_features[OBS_STATE].shape
+                if state_shape:
+                    state_dim = state_shape[0] if isinstance(state_shape[0], int) else 0
+                    if self.use_yolo_bboxes:
+                        bbox_dim_per_detection = 5
+                        num_cameras = len(self.yolo_camera_names) if self.yolo_camera_names else 3
+                        bbox_dim = num_cameras * self.yolo_max_detections_per_camera * bbox_dim_per_detection
+                        total_dim = state_dim + bbox_dim
+                        if total_dim > self.max_state_dim:
+                            raise ValueError(
+                                f"State dimension ({state_dim}) + bounding box dimension ({bbox_dim}) = {total_dim} "
+                                f"exceeds max_state_dim ({self.max_state_dim}). "
+                                f"Either increase max_state_dim or set auto_detect_state_dim=True."
+                            )
+        # end new update
     def get_optimizer_preset(self) -> AdamWConfig:
         return AdamWConfig(
             lr=self.optimizer_lr,
