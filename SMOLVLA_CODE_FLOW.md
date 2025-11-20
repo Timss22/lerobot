@@ -4,8 +4,8 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ 1. CONFIGURATION                                                 │
-│    File: configuration_smolvla.py                              │
+│ 1. CONFIGURATION                                                │
+│    File: configuration_smolvla.py                               │
 │    - Learning rate, batch size, architecture params             │
 │    - Input/output dimensions                                    │
 └──────────────────────┬──────────────────────────────────────────┘
@@ -13,7 +13,7 @@
                        ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ 2. DATA LOADING                                                 │
-│    File: datasets/lerobot_dataset.py                           │
+│    File: datasets/lerobot_dataset.py                            │
 │    - Load images, states, actions                               │
 │    - Apply delta_timestamps                                     │
 └──────────────────────┬──────────────────────────────────────────┘
@@ -21,8 +21,8 @@
                        ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ 3. PREPROCESSING                                                │
-│    File: processor_smolvla.py                                  │
-│    Steps:                                                        │
+│    File: processor_smolvla.py                                   │
+│    Steps:                                                       │
 │    - Rename observations                                        │
 │    - Add batch dimension                                        │
 │    - Add newline to task                                        │
@@ -34,34 +34,34 @@
                        ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ 4. MODEL FORWARD PASS                                           │
-│    File: modeling_smolvla.py                                   │
+│    File: modeling_smolvla.py                                    │
 │                                                                 │
-│    ┌─────────────────────────────────────────────┐             │
-│    │ SmolVLAPolicy.forward()                    │             │
-│    │   └─> VLAFlowMatching.forward()           │             │
-│    └─────────────────────────────────────────────┘             │
+│    ┌─────────────────────────────────────────────┐              │
+│    │ SmolVLAPolicy.forward()                     │              │
+│    │   └─> VLAFlowMatching.forward()             │              │
+│    └─────────────────────────────────────────────┘              │
 │                       │                                         │
 │                       ▼                                         │
-│    ┌─────────────────────────────────────────────┐             │
-│    │ SmolVLMWithExpertModel.forward()           │             │
-│    │   ├─> embed_image()                        │             │
-│    │   ├─> embed_language_tokens()              │             │
-│    │   └─> forward_attn_layer() or              │             │
-│    │       forward_cross_attn_layer()            │             │
-│    └─────────────────────────────────────────────┘             │
+│    ┌─────────────────────────────────────────────┐              │
+│    │ SmolVLMWithExpertModel.forward()            │              │
+│    │   ├─> embed_image()                         │              │
+│    │   ├─> embed_language_tokens()               │              │
+│    │   └─> forward_attn_layer() or               │              │
+│    │       forward_cross_attn_layer()            │              │
+│    └─────────────────────────────────────────────┘              │
 │                       │                                         │
 │                       ▼                                         │
-│    ┌─────────────────────────────────────────────┐             │
-│    │ Flow Matching                              │             │
-│    │   - Predict action sequence                 │             │
-│    └─────────────────────────────────────────────┘             │
+│    ┌─────────────────────────────────────────────┐              │
+│    │ Flow Matching                               │              │
+│    │   - Predict action sequence                 │              │
+│    └─────────────────────────────────────────────┘              │
 └──────────────────────┬──────────────────────────────────────────┘
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ 5. LOSS COMPUTATION                                             │
 │    File: modeling_smolvla.py                                    │
-│    - Compute flow matching loss                                │
+│    - Compute flow matching loss                                 │
 └──────────────────────┬──────────────────────────────────────────┘
                        │
                        ▼
@@ -76,7 +76,7 @@
                        ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ 7. POSTPROCESSING                                               │
-│    File: processor_smolvla.py                                  │
+│    File: processor_smolvla.py                                   │
 │    - Unnormalize actions                                        │
 │    - Move to CPU                                                │
 └─────────────────────────────────────────────────────────────────┘
@@ -86,7 +86,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    SmolVLA Architecture                          │
+│                    SmolVLA Architecture                         │
 └─────────────────────────────────────────────────────────────────┘
 
 Inputs:
@@ -106,8 +106,8 @@ Inputs:
 ┌─────────────────────────────────────────────────────────────────┐
 │ VLM (Vision-Language Model)                                     │
 │ - Processes vision + language                                   │
-│ - num_vlm_layers: 16 (configurable)                            │
-│ - Generates key-value cache                                    │
+│ - num_vlm_layers: 16 (configurable)                             │
+│ - Generates key-value cache                                     │
 └──────────────────────┬──────────────────────────────────────────┘
                        │
                        │ (KV Cache)
@@ -115,7 +115,7 @@ Inputs:
 ┌─────────────────────────────────────────────────────────────────┐
 │ Action Expert                                                   │
 │ - Smaller than VLM (expert_width_multiplier: 0.75)              │
-│ - num_expert_layers: -1 (same as VLM)                          │
+│ - num_expert_layers: -1 (same as VLM)                           │
 │ - Cross-attention to VLM                                        │
 │ - Processes action tokens                                       │
 └──────────────────────┬──────────────────────────────────────────┘
@@ -123,9 +123,9 @@ Inputs:
                        ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ Projection Layers                                               │
-│ - state_proj: State → VLM hidden size                          │
-│ - action_in_proj: Action → Expert hidden size                  │
-│ - action_out_proj: Expert hidden size → Action                 │
+│ - state_proj: State → VLM hidden size                           │
+│ - action_in_proj: Action → Expert hidden size                   │
+│ - action_out_proj: Expert hidden size → Action                  │
 └──────────────────────┬──────────────────────────────────────────┘
                        │
                        ▼
